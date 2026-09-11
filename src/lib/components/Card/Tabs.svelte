@@ -14,9 +14,8 @@
     onselect?: (tab: Tab) => void;
   } = $props();
 
-  if (!activeTabID && tabs.length > 0) {
-    activeTabID = tabs[0].id;
-  }
+  // Derive (don't mutate the prop) so the highlight tracks a bound activeTabID.
+  const effectiveTabID = $derived(activeTabID || tabs[0]?.id);
 
   const toggleTabs = (tab: Tab) => {
     return (event: Event) => {
@@ -28,13 +27,13 @@
 
 <div class="flex w-fit cursor-default items-center gap-2">
   <ul class="flex gap-2 align-middle" transition:fade>
-    {#each tabs as tab, index}
+    {#each tabs as tab, index (tab.id)}
       <Button
         role="tab"
         variant="ghost"
         class={[
           'px-2',
-          activeTabID === tab.id && 'rounded-b-none border-b-2 border-b-primary-foreground/50'
+          effectiveTabID === tab.id && 'rounded-b-none border-b-2 border-b-primary-foreground/50'
         ]}
         onclick={toggleTabs(tab)}
         onkeypress={toggleTabs(tab)}>
