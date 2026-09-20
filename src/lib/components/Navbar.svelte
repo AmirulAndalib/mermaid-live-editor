@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  import { logEvent, plausible } from '$lib/util/stats';
+  import { logEvent, logMermaidChartClick } from '$lib/util/stats';
   import { version } from 'mermaid/package.json';
 
   void logEvent('version', {
@@ -8,15 +8,13 @@
 </script>
 
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import MainMenu from '$/components/MainMenu.svelte';
-  import McWrapper from '$/components/McWrapper.svelte';
   import { Button } from '$/components/ui/button';
   import { Separator } from '$/components/ui/separator';
-  import { Switch } from '$/components/ui/switch';
-  import { dismissPromotion, getActivePromotion } from '$lib/util/promos/promo';
-  import { urlsStore } from '$lib/util/state';
-  import { MCBaseURL } from '$lib/util/util';
-  import type { ComponentProps, Snippet } from 'svelte';
+  import { dismissPromotion, getActivePromotion } from '$lib/util/promos/promo.svelte';
+  import { untrack, type ComponentProps, type Snippet } from 'svelte';
+  import MermaidIcon from '~icons/custom/mermaid';
   import CloseIcon from '~icons/material-symbols/close-rounded';
   import GithubIcon from '~icons/mdi/github';
   import DropdownNavMenu from './DropdownNavMenu.svelte';
@@ -24,11 +22,10 @@
   interface Props {
     mobileToggle?: Snippet;
     children: Snippet;
+    hidePromotion?: boolean;
   }
 
-  let { children, mobileToggle }: Props = $props();
-
-  const isReferral = document.referrer.includes(MCBaseURL);
+  let { children, mobileToggle, hidePromotion = false }: Props = $props();
 
   type Links = ComponentProps<typeof DropdownNavMenu>['links'];
 
@@ -44,22 +41,23 @@
     }
   ];
 
-  let activePromotion = $state(getActivePromotion());
+  let activePromotion = $state(untrack(() => (hidePromotion ? undefined : getActivePromotion())));
 
   const trackBannerClick = () => {
-    if (!plausible || !activePromotion) {
+    if (!activePromotion) {
       return;
     }
     logEvent('bannerClick', {
       promotion: activePromotion.id
     });
+    logMermaidChartClick('banner');
   };
 </script>
 
 {#if activePromotion}
   <div class="top-bar z-10 flex h-fit w-full bg-primary">
     <div
-      class="flex flex-grow"
+      class="flex grow"
       role="button"
       tabindex="0"
       onclick={trackBannerClick}
@@ -83,48 +81,15 @@
 {/if}
 
 <nav class="z-50 flex p-4 sm:p-6">
-  <div class="flex flex-1 items-center gap-4">
+  <div class="flex flex-1 items-center gap-2">
     <MainMenu />
-    <div
-      id="switcher"
-      class="flex items-center justify-center gap-4 font-medium"
-      class:flex-row-reverse={isReferral}>
-      <a href="/" class="whitespace-nowrap text-accent">
-        {#if !isReferral && !mobileToggle}
-          Mermaid
-        {/if}
-        Live Editor
-      </a>
-
-      <McWrapper labelPrefix="Opens the current diagram in">
-        <div class="hidden items-center justify-center gap-4 md:flex">
-          <Separator orientation="vertical" />
-          <Switch
-            id="editorMode"
-            class="data-[state=checked]:bg-secondary"
-            checked={isReferral}
-            onclick={() => {
-              logEvent('playgroundToggle', { isReferred: isReferral });
-              // Wait for the event to be logged
-              setTimeout(() => {
-                window.open(
-                  $urlsStore.mermaidChart({ medium: 'toggle' }).playground,
-                  '_self',
-                  // Do not send referrer header, if the user already came from playground
-                  isReferral ? 'noreferrer' : ''
-                );
-              }, 100);
-            }} />
-
-          <a
-            href={$urlsStore.mermaidChart({ medium: 'toggle' }).playground}
-            class="whitespace-nowrap">
-            Playground <span class="hidden text-sm opacity-50 lg:inline"
-              >- more features, no account required</span>
-          </a>
-        </div>
-      </McWrapper>
-    </div>
+    <MermaidIcon class="size-6" />
+    <a href={resolve('/', {})} class="whitespace-nowrap text-accent">
+      {#if !mobileToggle}
+        Mermaid
+      {/if}
+      Live Editor
+    </a>
   </div>
   <div
     id="menu"

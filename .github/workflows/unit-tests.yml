@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - develop
+  merge_group:
 
 jobs:
   unit-tests:
@@ -37,6 +38,9 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Type check
+        run: pnpm check
 
       - name: Run unit tests
         run: pnpm test:unit
