@@ -3,25 +3,31 @@
   import Card from '$/components/Card/Card.svelte';
   import DiagramDocButton from '$/components/DiagramDocumentationButton.svelte';
   import Editor from '$/components/Editor.svelte';
+  import EnhancedEditsButton from '$/components/EnhancedEditsButton.svelte';
   import History from '$/components/History/History.svelte';
+  import { startAutoSave } from '$/components/History/historyState.svelte';
   import McWrapper from '$/components/McWrapper.svelte';
   import MermaidChartIcon from '$/components/MermaidChartIcon.svelte';
+  import EditorChooserModal from '$/components/migration/EditorChooserModal.svelte';
   import Navbar from '$/components/Navbar.svelte';
   import PanZoomToolbar from '$/components/PanZoomToolbar.svelte';
   import Preset from '$/components/Preset.svelte';
   import Share from '$/components/Share.svelte';
   import SyncRoughToolbar from '$/components/SyncRoughToolbar.svelte';
   import { Button } from '$/components/ui/button';
+  import { Separator } from '$/components/ui/separator';
   import * as Resizable from '$/components/ui/resizable';
   import { Switch } from '$/components/ui/switch';
   import { Toggle } from '$/components/ui/toggle';
   import VersionSecurityToolbar from '$/components/VersionSecurityToolbar.svelte';
   import View from '$/components/View.svelte';
   import type { EditorMode, Tab } from '$/types';
+  import { shouldShowEditorChooser } from '$/util/migration/domainMigration';
   import { PanZoomState } from '$/util/panZoom';
-  import { stateStore, updateCodeStore, urlsStore } from '$/util/state';
-  import { logEvent } from '$/util/stats';
-  import { initHandler } from '$/util/util';
+  import { env } from '$/util/env';
+  import { validatedState, updateCodeStore, urls } from '$/util/state.svelte';
+  import { logEvent, logMermaidChartClick } from '$/util/stats';
+  import { getContactSalesUrl, initHandler } from '$/util/util';
   import { onMount } from 'svelte';
   import CodeIcon from '~icons/custom/code';
   import HistoryIcon from '~icons/material-symbols/history';
@@ -50,13 +56,18 @@
   let width = $state(0);
   let isMobile = $derived(width < 640);
   let isViewMode = $state(true);
+  let showEditorChooser = $state(false);
 
   onMount(async () => {
+    showEditorChooser = shouldShowEditorChooser();
     await initHandler();
     window.addEventListener('appinstalled', () => {
       logEvent('pwaInstalled', { isMobile });
     });
   });
+
+  // Record the Timeline for the whole session, not just while the panel is open.
+  onMount(() => startAutoSave());
 
   let isHistoryOpen = $state(false);
 
@@ -82,20 +93,34 @@
   {/snippet}
 
   <Navbar mobileToggle={isMobile ? mobileToggle : undefined}>
-    <Toggle bind:pressed={isHistoryOpen} size="sm">
+    <Toggle bind:pressed={isHistoryOpen} size="sm" title="History" aria-label="History">
       <HistoryIcon />
     </Toggle>
     <Share />
-    <McWrapper>
-      <Button
-        variant="accent"
-        size="sm"
-        href={$urlsStore.mermaidChart({ medium: 'save_diagram' }).save}
-        target="_blank">
-        <MermaidChartIcon />
-        Save diagram
-      </Button>
-    </McWrapper>
+    {#if env.isEnabledMermaidChartLinks}
+      <Separator orientation="vertical" />
+      <McWrapper labelPrefix="Opens ">
+        <Button
+          size="sm"
+          href={getContactSalesUrl()}
+          target="_blank"
+          onclick={() => logMermaidChartClick('contactSales')}>
+          <MermaidChartIcon />
+          Contact sales
+        </Button>
+      </McWrapper>
+      <McWrapper>
+        <Button
+          variant="accent"
+          size="sm"
+          href={urls.current.mermaidChart({ medium: 'save_diagram' }).save}
+          target="_blank"
+          onclick={() => logMermaidChartClick('saveDiagram')}>
+          <MermaidChartIcon />
+          Save diagram
+        </Button>
+      </McWrapper>
+    {/if}
   </Navbar>
 
   <div class="flex flex-1 flex-col overflow-hidden" bind:clientWidth={width}>
@@ -114,7 +139,7 @@
               onselect={tabSelectHandler}
               isOpen
               tabs={editorTabs}
-              activeTabID={$stateStore.editorMode}
+              activeTabID={validatedState.current.editorMode}
               isClosable={false}>
               {#snippet actions()}
                 <DiagramDocButton />
@@ -130,17 +155,17 @@
         </Resizable.Pane>
         <Resizable.Handle class="mr-1 hidden opacity-0 sm:block" />
         <Resizable.Pane minSize={15} class="relative flex h-full flex-1 flex-col overflow-hidden">
-          <View {panZoomState} shouldShowGrid={$stateStore.grid} />
-          <div class="absolute right-0 top-0"><PanZoomToolbar {panZoomState} /></div>
-          <div class="absolute bottom-0 right-0"><VersionSecurityToolbar /></div>
+          <View {panZoomState} shouldShowGrid={validatedState.current.grid} />
+          <div class="absolute top-0 left-5 hidden md:block"><EnhancedEditsButton /></div>
+          <div class="absolute top-0 right-0">
+            <PanZoomToolbar {panZoomState} fullScreenHref={urls.current.view} />
+          </div>
+          <div class="absolute right-0 bottom-0"><VersionSecurityToolbar /></div>
           <div class="absolute bottom-0 left-0 sm:left-5"><SyncRoughToolbar /></div>
         </Resizable.Pane>
         {#if isHistoryOpen}
           <Resizable.Handle class="ml-1 hidden opacity-0 sm:block" />
-          <Resizable.Pane
-            minSize={15}
-            defaultSize={30}
-            class="hidden h-full flex-grow flex-col sm:flex">
+          <Resizable.Pane minSize={15} defaultSize={30} class="hidden h-full grow flex-col sm:flex">
             <History />
           </Resizable.Pane>
         {/if}
@@ -148,3 +173,5 @@
     </div>
   </div>
 </div>
+
+<EditorChooserModal bind:open={showEditorChooser} />
